@@ -3,6 +3,7 @@ var router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { uuid } = require('uuidv4');
+const { db } = require('../mongo.js');
 
 
 /* GET users listing. */
@@ -24,7 +25,14 @@ router.post("/registration", async (req, res, next) => {
       password: hashPword,
       id: uuid()
     };
-    
+
+    const result = await db().collection("users").insertOne(user);
+
+    res.json({
+      success: true,
+      message: "User created",
+      result
+    })
 
   } catch (err) {
     res.json({
@@ -38,10 +46,19 @@ router.post("/login", async (req, res, next) => {
   try { 
     const email = req.body.email;
     const password = req.body.password;
+    const user = await db().collection("users").findOne({ email });
 
-    const hashedUserPassword = user.password;
+    if (!user) {
+      res.json({
+        success: false,
+        message: "User not found"
+      }).status(204);
+      return;
+    }
 
-    const isPasswordCorrect = await bcrypt.compare(password, hashedUserPassword);
+    const hashedUserPword = user.password;
+
+    const isPasswordCorrect = await bcrypt.compare(password, hashedUserPword);
 
     if (!isPasswordCorrect) {
       res.json({
@@ -51,17 +68,24 @@ router.post("/login", async (req, res, next) => {
       return;
     }
 
+    const permish = email.includes("@codeimmersives.com") ? "admin" : "user";
+
+    const userData = { 
+      date: new Date(),
+      id: user.id,
+      scope: permish
+    };
+
+    const theKey = process.env.JWT_SECRET_KEY;
+
     const exp = Math.floor(Date.now() / 1000) + (60 * 60);
 
     const payload = {
-      email,
-      exp,
-      scope: "user"
+      userData,
+      exp
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "1h"
-    });
+    const token = jwt.sign(payload, theKey);
 
     res.json({
       success: true,
@@ -77,12 +101,32 @@ router.post("/login", async (req, res, next) => {
 })
 
 router.get("/message", (req, res, next) => {
+  const tokenHeaderKey = process.env.TOKEN_HEADER_KEY;
+  const token = req.header(tokenHeaderKey);
+  const theKey = process.env.JWT_SECRET_KEY;
   try {
-    const token = req.header("ci-token");
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    const verified = jwt.verify(token, theKey);
 
-    console.log(verified);
-
+    if (!verified) {
+      return res.json({
+        success: false,
+        message: "ID Token could not be verified",
+      });
+    }
+    if (verified.userData.scope === "admin") {
+      res.json({
+        success: true,
+        message: "You are an admin",
+        verified
+      });
+    }
+    if (verified.userData.scope === "user") {
+      res.json({
+        success: true,
+        message: "You are a user",
+        verified
+      });
+    }
   } catch (err) {
     res.json({
       success: false,
@@ -90,6 +134,5 @@ router.get("/message", (req, res, next) => {
     });
   }
 })
-
 
 module.exports = router;
