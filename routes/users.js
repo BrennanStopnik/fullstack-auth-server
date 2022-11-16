@@ -127,6 +127,8 @@ router.get("/message", (req, res, next) => {
         verified
       });
     }
+
+    throw Error("Access Denied");
   } catch (err) {
     res.json({
       success: false,
