@@ -11,7 +11,7 @@ router.get('/', function(req, res, next) {
   res.send('respond with a resource');
 });
 
-router.post("/registration", async (req, res, next) => {
+router.post("/register", async (req, res, next) => {
   try { 
     const email = req.body.email;
     const password = req.body.password;
@@ -63,7 +63,7 @@ router.post("/login", async (req, res, next) => {
     if (!isPasswordCorrect) {
       res.json({
         success: false,
-        error: "Incorrect password"
+        message: "Incorrect password"
       });
       return;
     }
@@ -90,7 +90,8 @@ router.post("/login", async (req, res, next) => {
     res.json({
       success: true,
       message: "Authentication successful!",
-      token
+      token,
+      email
     });    
   } catch (err) {
     res.json({
